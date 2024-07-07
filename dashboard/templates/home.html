@@ -17,6 +17,7 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.4.1/flowbite.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
 </head>
 <body class="bg-gray-100">
 
@@ -45,8 +46,10 @@
                 </div>
 
                 <!-- Secondary Navbar items -->
-                <div class="hidden md:flex items-center space-x-1">
+                <div class="hidden md:flex items-center space-x-2">
+                    {% block profile %}
                     <a href="{% url 'signup' %}" class="py-2 px-3 bg-blue-500 text-white rounded hover:bg-blue-400">Sign Up</a>
+                    {% endblock %}
                     {% block loginout %}<a href="{% url 'login' %}" class="py-2 px-3 bg-gray-500 text-white rounded hover:bg-gray-400">Login</a>{% endblock %}
                 </div>
 
@@ -120,12 +123,7 @@
 
     
     {% endblock %}
-    <!-- Footer -->
-    <footer class="bg-white py-8">
-        <div class="container mx-auto text-center">
-            <p class="text-gray-600">&copy; 2024 Hospital. All rights reserved.</p>
-        </div>
-    </footer>
+    
 
 
     

@@ -1,9 +1,7 @@
-from django.shortcuts import render, redirect
-# import templates
-# Create your views here.
+from django.shortcuts import render, redirect,get_object_or_404
 
 from django.http import HttpResponse
-from .models import Patient, Doctor, User
+from .models import Patient, Doctor, User, Blog_Post
 from django.contrib.auth import authenticate, login as auth_login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -21,23 +19,14 @@ def login(request):
         print(f"Username: {username}")
         print(f"Password: {password}")
         user = authenticate(request, username=username, password=password)
-        # user = User.objects.get(username=username)
         
         if user is not None:
-            # if user.password == password:
             auth_login(request, user)
-            # return redirect('profile')
             message = 'Sent'
             success = True
-            # return render(request,'login_form.html',{'message':message,'show_toast':True,'success':success})
-            return redirect('profile') 
-        # else:
-        #         message = 'invalid password'
-        #         success = False
-        #         return render(request,'login_form.html',{'message':message,'show_toast':True,'success':success})                
+            return redirect('profile')             
 
         else:
-            # messages.error(request, 'Invalid username or password')
             message = 'User not found'
             success = False
             return render(request,'login_form.html',{'message':message,'show_toast':True,'success':success})
@@ -48,6 +37,7 @@ def login(request):
 def profile_view(request):
     user = request.user
 
+
     if not request.user.is_authenticated:
         return redirect('')
 
@@ -55,16 +45,22 @@ def profile_view(request):
     try:
         profile = Patient.objects.get(user=user)
         profile_type = 'patient'
+        blog_posts = Blog_Post.objects.filter(draft = False)
+
+        return render(request, 'Profile/patient_profile.html', {'profile': profile,'blog_posts':blog_posts})
     except Patient.DoesNotExist:
         # If not a Patient, check if the user has a related Doctor profile
         try:
             profile = Doctor.objects.get(user=user)
             profile_type = 'doctor'
+            blog_posts = Blog_Post.objects.filter(author=profile,draft = False)
+            draft_blog_posts = Blog_Post.objects.filter(author=profile,draft = True)
+            return render(request, 'Profile/doctor_profile.html', {'profile': profile, 'blog_posts': blog_posts, 'draft_blog_posts':draft_blog_posts})
         except Doctor.DoesNotExist:
             profile = None
             profile_type = None
 
-    return render(request, 'profile.html', {'profile': profile, 'profile_type': profile_type})
+    
 
 def logout_view(request):
     logout(request)
@@ -182,9 +178,74 @@ def signup(request):
                 message = 'Something went wrong!'
                 success = False
                 print("Something went wrong",e)
-        # Optionally, redirect to a success page or another URL
-        # return redirect('signup_success')
-        # return HttpResponse("success")
         return render(request,'signup_form.html',{'message':message, 'show_toast': True,'success':success})
+    
 
+@login_required
+def post_blog(request):
+    if request.method == 'POST':
+        title = request.POST.get('title')
+        content = request.POST.get('content')
+        category = request.POST.get('category')
+        image = request.FILES.get('image')
+        draft = request.POST.get('draft') 
+
+        if draft:  
+            is_draft = True
+        else:
+            is_draft = False
+        lines = content.split('\n')
+        summary = '\n'.join(lines[:2]) + "....."
+
+        print(title, content, category, image)
+        doctor = request.user
+        profile = Doctor.objects.get(user=doctor)
+        blog_post = Blog_Post(
+            title=title,
+            content=content,
+            summary = summary, 
+            category=category,
+            image=image,
+            author=profile,
+            draft = is_draft
+
+        )
+        blog_post.save()
+        success_message = "Your blog post has been successfully saved!"
+    
+    return redirect('/dash/profile/')
+
+@login_required
+def delete_post(request, post_id):
+    print("inside delete")
+    post = get_object_or_404(Blog_Post, id=post_id)
+    
+    if request.user != post.author.user:
+        print("ERROR")
+    if post:
+        post.delete()
+    return redirect('/dash/profile')
+
+@login_required
+def update_post(request):
+    if request.method == 'POST':
+        post_id = request.POST.get('post_id')
+        print("posstid", post_id)
+        title = request.POST.get('title')
+        print("posstitlte", title)
+
+        content = request.POST.get('content')
+        category = request.POST.get('category')
+        draft = request.POST.get('draft')
+
+        post = get_object_or_404(Blog_Post, id=post_id)
+
+        post.title = title
+        post.content = content
+        post.category = category
+        post.draft = True if draft == 'on' else False 
+        if 'image' in request.FILES:
+            post.image = request.FILES['image']
+        post.save()
+        return redirect('/dash/profile')
     

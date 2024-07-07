@@ -36,3 +36,24 @@ class Doctor(Profile):
 
     def __str__(self):
         return f"{self.user.username} (Doctor)"
+    
+CATEGORY_CHOICES = [
+    ('mental_health', 'Mental Health'),
+    ('heart_disease', 'Heart Disease'),
+    ('covid_19', 'COVID-19'),
+    ('immunization', 'Immunization'),
+]
+
+class Blog_Post(models.Model):
+    title = models.CharField(max_length=200)
+    image = models.ImageField(upload_to='blog/images/', null=True, blank=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    summary = models.TextField()
+    content = models.TextField()
+    author = models.ForeignKey(Doctor, on_delete=models.CASCADE)
+    draft = models.BooleanField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.title

@@ -9,4 +9,7 @@ urlpatterns = [
     path('logout/',logout_view, name='logout'),
     path('signup/',signup, name='signup'),
     path('profile/', profile_view, name='profile'),
+    path('post/', post_blog, name='post_blog'),
+    path('post/delete/<int:post_id>/', delete_post, name='delete_post'),
+    path('post/update/', update_post, name='update_post')
 ]
