@@ -1,10 +1,13 @@
+import datetime as dt
+from datetime import datetime
 from django.shortcuts import render, redirect,get_object_or_404
 
 from django.http import HttpResponse
-from .models import Patient, Doctor, User, Blog_Post
+from .models import Patient, Doctor, User, Blog_Post, Appointment
 from django.contrib.auth import authenticate, login as auth_login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from .google_calendar import create_google_calendar_event
 
 def index(request):
     return render(request,'home.html')
@@ -46,8 +49,12 @@ def profile_view(request):
         profile = Patient.objects.get(user=user)
         profile_type = 'patient'
         blog_posts = Blog_Post.objects.filter(draft = False)
+        doctors = Doctor.objects.all()
+        appointments = Appointment.objects.filter(patient=profile)
+        d = [doctors[0]]
 
-        return render(request, 'Profile/patient_profile.html', {'profile': profile,'blog_posts':blog_posts})
+
+        return render(request, 'Profile/patient_profile.html', {'profile': profile,'blog_posts':blog_posts, 'doctors':d,'appointments':appointments})
     except Patient.DoesNotExist:
         # If not a Patient, check if the user has a related Doctor profile
         try:
@@ -55,7 +62,9 @@ def profile_view(request):
             profile_type = 'doctor'
             blog_posts = Blog_Post.objects.filter(author=profile,draft = False)
             draft_blog_posts = Blog_Post.objects.filter(author=profile,draft = True)
-            return render(request, 'Profile/doctor_profile.html', {'profile': profile, 'blog_posts': blog_posts, 'draft_blog_posts':draft_blog_posts})
+            appointments = Appointment.objects.filter(doctor=profile)
+
+            return render(request, 'Profile/doctor_profile.html', {'profile': profile, 'blog_posts': blog_posts, 'draft_blog_posts':draft_blog_posts,'appointments':appointments})
         except Doctor.DoesNotExist:
             profile = None
             profile_type = None
@@ -249,3 +258,106 @@ def update_post(request):
         post.save()
         return redirect('/dash/profile')
     
+
+
+def convert_to_iso_format_with_end_time(date_str, time_str):
+    try:
+        # Parse date and time strings
+        date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+        time_obj = datetime.strptime(time_str, "%H:%M").time()
+
+        # Combine date and time into a datetime object
+        combined_datetime = datetime.combine(date_obj.date(), time_obj)
+
+        # Add 45 minutes to the combined datetime
+        end_datetime = combined_datetime + dt.timedelta(minutes=45)
+
+        # Format end datetime into ISO 8601 format
+        iso_start = combined_datetime.isoformat()
+        iso_end = end_datetime.isoformat()
+
+        return iso_start, iso_end
+    except ValueError as e:
+        print(f"Error parsing date or time: {e}")
+        return None, None
+    
+@login_required
+def book_appointment(request):
+    if request.method == 'POST':
+            patient_id = request.POST.get('patient_id')
+            doctor_id = request.POST.get('doctor_id')
+            appointment_date = request.POST.get('appointment_date')
+            appointment_time = request.POST.get('appointment_time')
+            required_speciality = request.POST.get('required_speciality')
+            print("APPP",appointment_time)
+            p_user = User.objects.get(id=patient_id)
+            d_user = User.objects.get(id=doctor_id)
+
+            doctor = Doctor.objects.get(user=d_user)
+            patient = Patient.objects.get(user=p_user)
+            original_date = datetime.strptime(appointment_date, "%m/%d/%Y")
+    
+            formatted_date = original_date.strftime("%Y-%m-%d")
+            text_date = str(appointment_date)
+            text_time = str(appointment_time)
+            print("TIEM SDJNSKDJFNK",str(appointment_date), str(appointment_time))
+            iso_start_datetime, iso_end_datetime = convert_to_iso_format_with_end_time(str(appointment_date), str(appointment_time))
+
+            appointment_start_time = datetime.strptime(appointment_time, '%H:%M').time()
+
+            # Calculate end time by adding 45 minutes to start time
+            end_time = (datetime.combine(datetime.today(), appointment_start_time) + dt.timedelta(minutes=45)).time()
+            print("Calendar event created for the Doctor",end_time)
+
+            appointment = Appointment(
+                doctor =doctor,
+                patient=patient,
+                required_speciality = required_speciality,
+                date = formatted_date,
+                time = appointment_time,
+                end_time = end_time
+            )
+            print("ISOSSOOSS", iso_start_datetime, iso_end_datetime)
+            appointment_data = {
+                'doctor' : doctor,
+                'patient' : patient,
+                'startdatetime' : iso_start_datetime,
+                'enddatetime' : iso_end_datetime
+            }
+            
+            # Create Google Calendar event
+            event = create_google_calendar_event(appointment_data)
+            appointment.google_event_id = event['id']
+            appointment.save()
+            print("Calendar event created for the Doctor")
+    return redirect('profile')
+
+# @login_required
+# def update_appointment(request):
+#     if request.method == 'POST':
+#         appointment_id = request.POST.get('appointment_id')
+#         status = request.POST.get('status')  # 'confirmed' or 'cancelled'
+
+#         appointment = get_object_or_404(Appointment, id=appointment_id)
+
+#         # Update appointment status
+#         if status == 'confirmed':
+#             appointment.status = 'Confirmed'
+#             # Optionally, create Google Calendar event if confirmed
+#             iso_start_datetime, iso_end_datetime = convert_to_iso_format_with_end_time(str(appointment.appointment_date),str(appointment.appointment_time))
+#             appointment_data = {
+#                 'doctor' : appointment.doctor,
+#                 'patient' : appointment.patient,
+#                 'startdatetime' : iso_start_datetime,
+#                 'enddatetime' : iso_end_datetime
+#             }
+#             event = create_google_calendar_event(appointment_data)
+#             appointment.google_event_id = event['id']  # Assuming you save event ID in appointment model
+#             appointment.save()
+#             print("Appointment confirmed and Google Calendar event created.")
+#         elif status == 'cancelled':
+#             appointment.status = 'cancelled'
+#             appointment.save()
+#             print("Appointment cancelled.")
+
+#     return redirect('profile')

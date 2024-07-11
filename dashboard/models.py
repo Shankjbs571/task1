@@ -57,3 +57,25 @@ class Blog_Post(models.Model):
 
     def __str__(self):
         return self.title
+    
+
+class Appointment(models.Model):
+    STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('Confirmed', 'Confirmed'),
+        ('Cancelled', 'Cancelled'),
+    ]
+
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='appointments')
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='appointments')
+    date = models.DateField()
+    time = models.TimeField()
+    end_time = models.TimeField(blank=True,null=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')
+    required_speciality = models.TextField(default="Full Body")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    google_event_id = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return f"Appointment with {self.doctor.user.username} on {self.date} at {self.time}"
